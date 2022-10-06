@@ -25,8 +25,13 @@ import datetime
 from typing import List, Dict
 import news
 import clock
+import sys
+import prometheus_client
 
 CHROME_DRIVER = 'D:\programming\git\chromedriver.exe'
+
+SCRAPE_TIME = prometheus_client.Summary('scrape_duration', 'Time spent scraping a website', ['website'])
+SCRAPE_ERROR_CNT = prometheus_client.Counter('scrape_errors', 'Number of errors while scraping', ['website'])
 
 class WebScraper(object):
     
@@ -35,47 +40,48 @@ class WebScraper(object):
         self.__chrome_options = webdriver.ChromeOptions()
         self.__chrome_options.add_argument('--headless')
         self.__chrome_options.add_argument('--no-sandbox')
+        self.__chrome_options.add_argument("--log-level=3")
         self.__chrome_options.add_argument('--disable-dev-shm-usage')
         self.driver = webdriver.Chrome(CHROME_DRIVER, options=self.__chrome_options)
         self.driver.set_page_load_timeout(10)
         atexit.register(self.driver.quit)
-        self.__currencies_fetcher = lambda: {}
-        self.__news_callback = None
-        self.__loop_init = False
+        self.__token_checker_fn = lambda x: False 
         self.__clock = clk
         logging.info("Web Client initialized.")
         
-    def set_currencies_fetcher(self, currencies_fetcher):
-        self.__currencies_fetcher = currencies_fetcher
+    def set_token_checker_fn(self, token_checker_fn):
+        self.__token_checker_fn = token_checker_fn
         
-    def set_news_callback(self, news_callback):
-        self.__news_callback = news_callback
         
     def fetch_binance_announcement(self, n : news.News) -> news.News:
         self.driver.get(n.href)
-        WebDriverWait(self.driver, 5).until(EC.presence_of_element_located((By.XPATH, '//*[text()=\"' + n.title + '\"]')))
-        elem = self.driver.find_element(By.XPATH, '//*[text()=\"' + n.title + '\"]/following-sibling::div')
+        title_text = ""
+        for c in n.title:
+            if ord(c) < 128:
+                title_text += c
+            else:
+                break
+        WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.XPATH, '//h1[text()[contains(.,\"' + title_text + '\")]]')))
+        elem = self.driver.find_element(By.XPATH, '//h1[text()[contains(.,\"' + title_text + '\")]]/following-sibling::div')
         timestamp = time.mktime(datetime.datetime.strptime(elem.text, "%Y-%m-%d %H:%M").timetuple())
         elem = elem.find_element(By.XPATH, './following-sibling::div')
         full_text = elem.text
-        return news.News(n.source, timestamp, n.title, full_text, n.href, news.discover_tokens(n.title, self.__currencies_fetcher()))
+        return news.News(n.source, timestamp, n.title, full_text, n.href, news.discover_tokens(n.title, self.__token_checker_fn))
     
     def fetch_binance_announcements(self, source: news.Source, href: str, title : str):
         result : List[news.News] =  []
         self.driver.get(href)
         selector = '[text()="' + title + '"]'
-        WebDriverWait(self.driver, 5).until(EC.presence_of_element_located((By.XPATH, f"//*{selector}")))
+        WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.XPATH, f"//*{selector}")))
         elem = self.driver.find_element(By.XPATH, f"//div{selector}/following-sibling::div")
         if elem:
             elems = [e for e in elem.find_elements(By.XPATH, ".//a") if e.get_attribute('href').startswith('https://www.binance.com/en/support/announcement')]
-            candidates : List[news.News] = [news.News(source, 0, e.text[0:-10], "", e.get_attribute('href'), []) for e in elems]
+            candidates : List[news.News] = [news.News(source, self.__clock.now(), e.text[0:-10], "", e.get_attribute('href'), []) for e in elems]
             for c in candidates[0:2]:
                 if c.title not in news.cache[source]:
-                    r = self.fetch_binance_announcement(c)
+                    r = c # self.fetch_binance_announcement(c)
                     news.cache[source][r.title] = r
                     result.append(r)
-                    if self.__loop_init == False and self.__news_callback != None:
-                        self.__news_callback(r)
         return result
         
     def fetch_latest_binance_news(self) -> List[news.News]:
@@ -84,23 +90,42 @@ class WebScraper(object):
     def fetch_new_binance_listings(self) -> List[news.News]:
         return self.fetch_binance_announcements(news.Source.BINANCE_LISTING, 'https://www.binance.com/en/support/announcement/c-48', 'New Cryptocurrency Listing')
     
-    def run_in_background(self):
-        def loop():
-            self.__loop_init = True
-            logging.info("Fetching initial news")
-            self.fetch_latest_binance_news()
-            self.fetch_new_binance_listings()
-            logging.info("Initial news fetched")
+    
+        
+        
+def scrape_in_background(token_checker_fn, news_cb, clk):
+    scrape_fns = {
+        news.Source.BINANCE_NEWS.name: WebScraper.fetch_latest_binance_news, 
+        news.Source.BINANCE_LISTING.name: WebScraper.fetch_new_binance_listings
+    }
+    
+    for (website_name, scrape_fn) in scrape_fns.items():
+        def loop(website_name, scrape_fn):
+            logging.info(f"Fetching initial news for {website_name}")
+            web_scraper = WebScraper(clk)
+            web_scraper.set_token_checker_fn(token_checker_fn)
+            initial_news = scrape_fn(web_scraper)
+            for n in initial_news:
+                logging.info(f"Initial news: {n}")
+            logging.info(f"Initial news fetched for {website_name}")
             while True:
-                start = self.__clock.now()
-                news = self.fetch_latest_binance_news() + self.fetch_new_binance_listings()
-                logging.info(f"News fetching loop finished in {self.__clock.now() - start}ms")
-                for n in news:
-                    if self.__news_callback != None:
-                        self.__news_callback(n)
-                time.sleep(1)
-        background_thread = threading.Thread(target=loop, name="WebScraperLoop", daemon=True)
+                try:
+                    start = clk.now()
+                    news = scrape_fn(web_scraper)
+                    SCRAPE_TIME.labels(website_name).observe(clk.now() - start)
+                    #logging.info(f"News fetching loop finished in {clk.now() - start}ms")
+                    for n in news:
+                        news_cb(n)
+                except KeyboardInterrupt:
+                    logging.warning("Interupted by user")
+                    break
+                except Exception as e:
+                    SCRAPE_ERROR_CNT.labels(website_name).inc()
+                    logging.warning(f"Exception in scraping loop: {e}")
+                    time.sleep(10)
+        background_thread = threading.Thread(target=loop, args=(website_name, scrape_fn, ))
         background_thread.start()
+
 
 
             

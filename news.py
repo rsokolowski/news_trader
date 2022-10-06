@@ -17,12 +17,13 @@ class News(object):
         self.tokens = tokens
     
     def __repr__(self) -> str:
-        return f"{self.source.name}({datetime.datetime.fromtimestamp(self.timestamp)})={self.title}"
+        return f"{self.source.name}({datetime.datetime.fromtimestamp(self.timestamp / 1000.)})={self.title} [tokens=[{', '.join(self.tokens)}]]"
     
-def discover_tokens(text, tokens_maps) -> List[str]:
+def discover_tokens(text, token_checker_fn) -> List[str]:
     tokens : List[str] = []
     for word in text.split():
-        if word.upper() in tokens_maps.keys() and word not in tokens:
+        word_upper = word.upper()
+        if token_checker_fn(word_upper) and word_upper not in tokens:
             tokens.append(word)
     return tokens
     
