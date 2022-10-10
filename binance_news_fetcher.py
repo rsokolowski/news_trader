@@ -2,6 +2,7 @@ import random
 import string
 import time
 import logging
+from tkinter import E
 
 import requests
 
@@ -26,10 +27,12 @@ import news
 import clock
 import sys
 import prometheus_client
+from keys import keys
 
 FETCH_TIME = prometheus_client.Summary('fetch_duration', 'Time spent scraping a website', ['website', 'cache_hit'])
 FETCH_ERROR_CNT = prometheus_client.Counter('fetch_errors', 'Number of errors while scraping', ['website'])
 
+LAMBDA_FETCHERS = keys.get('lambda_binance_fetchers')
 
 class BinanceNewsFetcher(object):
     
@@ -38,6 +41,29 @@ class BinanceNewsFetcher(object):
         logging.info("Web Client initialized.")
         
     
+    def fetch_binance_announcement_from_lambda(self, source : news.Source, categoryId : int):
+        url = f"{random.choice(LAMBDA_FETCHERS)}/?category_id={categoryId}"
+        start_time = self.__clock.now()
+        cache_hit = False
+        try:
+            result = requests.get(url).json()
+            n = result['news']
+            if n == None:
+                FETCH_ERROR_CNT.labels(source.name).inc()
+                return []
+            cache_hit = n['cache_hit']
+            FETCH_TIME.labels(source.name, cache_hit).observe(self.__clock.now() - start_time)
+            candidate = news.News(source, n['releaseDate'], n['title'], "", "", [])
+            if candidate.title not in news.cache[source]:
+                news.cache[source][candidate.title] = candidate
+                return [candidate]
+            else:
+                return []
+        except Exception as e:
+            FETCH_ERROR_CNT.labels(source.name).inc()
+            logging.error(f"Error pulling binance announcement page: {e}")
+            return []
+        
     
     def fetch_binance_announcements(self, source : news.Source, categoryId : int):
         # Generate random query/params to help prevent caching
@@ -85,10 +111,10 @@ class BinanceNewsFetcher(object):
         
         
     def fetch_latest_binance_news(self) -> List[news.News]:
-        return self.fetch_binance_announcements(news.Source.BINANCE_NEWS, 49)
+        return self.fetch_binance_announcement_from_lambda(news.Source.BINANCE_NEWS, 49)
     
     def fetch_new_binance_listings(self) -> List[news.News]:
-        return self.fetch_binance_announcements(news.Source.BINANCE_LISTING, 48)
+        return self.fetch_binance_announcement_from_lambda(news.Source.BINANCE_LISTING, 48)
     
     
         
