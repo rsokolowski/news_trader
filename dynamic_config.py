@@ -54,6 +54,9 @@ def gain_percentage_to_keep() -> float:
 def min_percentage_for_the_moon() -> float:
     return float(get('min_percentage_for_the_moon', 1.01))
 
+def binance_fetcher_refresh_interval_s() -> float:
+    return float(get('binance_fetcher_refresh_interval_s', 0.2))
+
 def get(key : str, default = None):
     return config.get(key, default)
     

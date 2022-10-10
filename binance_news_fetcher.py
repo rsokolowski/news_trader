@@ -28,6 +28,7 @@ import clock
 import sys
 import prometheus_client
 from keys import keys
+import dynamic_config
 
 FETCH_TIME = prometheus_client.Summary('fetch_duration', 'Time spent scraping a website', ['website', 'cache_hit'])
 FETCH_ERROR_CNT = prometheus_client.Counter('fetch_errors', 'Number of errors while scraping', ['website'])
@@ -146,6 +147,7 @@ def fetch_in_background(news_cb, clk):
                 except Exception as e:
                     logging.warning(f"Exception in scraping loop: {e}")
                     time.sleep(10)
+                time.sleep(dynamic_config.binance_fetcher_refresh_interval_s())
         background_thread = threading.Thread(target=loop, args=(website_name, scrape_fn, ))
         background_thread.start()
 

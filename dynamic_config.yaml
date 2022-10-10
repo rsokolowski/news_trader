@@ -8,3 +8,4 @@ wait_time_after_initial_trade_s: 30
 max_hold_position_duration_s: 3600
 gain_percentage_to_keep: 0.75
 min_percentage_for_the_moon: 1.01
+binance_fetcher_refresh_interval_s: 0.2
