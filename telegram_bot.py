@@ -6,6 +6,7 @@ from keys import keys
 BOT_TOKEN = keys.get('BOT_TOKEN') 
 CHATS = keys.get('CHATS')
 
+
 class Bot(object):
     
     def __init__(self):

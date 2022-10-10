@@ -7,3 +7,4 @@ prometheus-client
 binance-futures-connector
 binance-connector
 certifi
+telethon

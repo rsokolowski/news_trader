@@ -5,6 +5,7 @@ import datetime
 class Source(Enum):
     BINANCE_NEWS = 1
     BINANCE_LISTING = 2
+    BINANCE = 3
 
 class News(object):
     
@@ -29,6 +30,7 @@ def discover_tokens(text, token_checker_fn) -> List[str]:
     
 
 cache : Dict[Source, Dict[str, News]] = { 
+    Source.BINANCE: {},
     Source.BINANCE_NEWS: {},
     Source.BINANCE_LISTING: {}
 }
