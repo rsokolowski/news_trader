@@ -49,11 +49,13 @@ class BinanceNewsFetcher(object):
             result = requests.get(url).json()
             n = result['news']
             if n == None:
+                logging.error(f"Error pulling binance announcement page: no news returned")
                 FETCH_ERROR_CNT.labels(source.name).inc()
                 return []
             cache_hit = n['cache_hit']
             FETCH_TIME.labels(source.name, cache_hit).observe(self.__clock.now() - start_time)
             candidate = news.News(source, n['releaseDate'], n['title'], "", "", [])
+            logging.info(f"News: {news}")
             if candidate.title not in news.cache[source]:
                 news.cache[source][candidate.title] = candidate
                 return [candidate]
