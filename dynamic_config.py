@@ -33,8 +33,8 @@ def close_position_price_percent() -> float:
 def open_position_price_percent() -> float:
     return float(get('open_position_price_percent', 1.02))
 
-def max_initial_funds_per_trade() -> float:
-    return float(get('max_initial_funds_per_trade', 10))
+def max_funds_per_trade() -> float:
+    return float(get('max_funds_per_trade', 10))
 
 def max_funds_percentage_per_trade() -> float:
     return float(get('max_funds_percentage_per_trade', 0.75))
@@ -56,6 +56,12 @@ def min_percentage_for_the_moon() -> float:
 
 def binance_fetcher_refresh_interval_s() -> float:
     return float(get('binance_fetcher_refresh_interval_s', 0.2))
+
+def coin_info_refresh_interval_s() -> float:
+    return float(get('coin_info_refresh_interval_s', 3600))
+
+def top_marketcaps_to_skip() -> int:
+    return int(get('top_marketcaps_to_skip', 8))
 
 def get(key : str, default = None):
     return config.get(key, default)

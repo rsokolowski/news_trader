@@ -50,13 +50,13 @@ class BinanceNewsFetcher(object):
             result = requests.get(url).json()
             n = result['news']
             if n == None:
-                logging.error(f"Error pulling binance announcement page: no news returned")
+                #logging.error(f"Error pulling binance announcement page: no news returned")
                 FETCH_ERROR_CNT.labels(source.name).inc()
                 return []
             cache_hit = n['cache_hit']
             FETCH_TIME.labels(source.name, cache_hit).observe(self.__clock.now() - start_time)
             candidate = news.News(source, n['releaseDate'], n['title'], "", "", [])
-            logging.info(f"News: {candidate}")
+            #logging.info(f"News: {candidate}")
             if candidate.title not in news.cache[source]:
                 news.cache[source][candidate.title] = candidate
                 return [candidate]
@@ -132,14 +132,18 @@ def fetch_in_background(news_cb, clk):
         def loop(website_name, scrape_fn):
             logging.info(f"Fetching initial news for {website_name}")
             web_scraper = BinanceNewsFetcher(clk)
-            initial_news = scrape_fn(web_scraper)
-            for n in initial_news:
-                logging.info(f"Initial news: {n}")
+            while True:
+                initial_news = scrape_fn(web_scraper)
+                for n in initial_news:
+                    logging.info(f"Initial news: {n}")
+                if len(initial_news) > 0:
+                    break
             logging.info(f"Initial news fetched for {website_name}")
             while True:
                 try:
                     news = scrape_fn(web_scraper)
                     for n in news:
+                        logging.info(f"Handling news: {news}")
                         news_cb(n)
                 except KeyboardInterrupt:
                     logging.warning("Interupted by user")

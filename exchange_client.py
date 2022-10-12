@@ -23,12 +23,13 @@ class PositionItem(object):
     def __init__(self, open_price : float, volume : float):
         self.open_price = open_price
         self.volume = volume
-        
+    
+    @property  
     def value(self) -> float:
         return self.volume * self.open_price
         
     def __repr__(self) -> str:
-        return f"POSITION: {self.volume}@{self.open_price} USD. Value = {self.value()} USD"
+        return f"POSITION: {self.volume}@{self.open_price} USD. Value = {self.value} USD"
     
     
 class Exchange(ABC):
@@ -66,12 +67,16 @@ class Exchange(ABC):
         pass
     
     @abstractmethod
+    def stop_market_watcher(self):
+        pass
+    
+    @abstractmethod
     def get_max_leverage(self, currency : str, market_type : MARKET_TYPE, initial_funds : float) -> int:
         pass
     
     @abstractmethod
     def new_buy_order(self, currency : str, market_type : MARKET_TYPE, 
-                   leverage : int, volume : float, limit_price : float, stop_price : float) -> List[str]:
+                   leverage : int, volume : float, limit_price : float) -> str:
         pass
     
     @abstractmethod
@@ -83,12 +88,13 @@ class Exchange(ABC):
         pass
     
     @abstractmethod
-    def get_position(self, currency : str, market_type : MARKET_TYPE) -> PositionItem:
+    def get_position(self, currency : str, market_type : MARKET_TYPE, open_order_id : str) -> PositionItem:
         pass
     
     @abstractmethod
     def transfer_funds(self, from_market : MARKET_TYPE, to_market : MARKET_TYPE):
         pass
+    
     
 
         
