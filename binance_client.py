@@ -73,17 +73,17 @@ class BinanceClient(Exchange):
         if market_type == MARKET_TYPE.FUTURES:
             account = self.futures_api.account()
             for asset in account['assets']:
-                if asset['asset'] == "USDT":
+                if asset['asset'] == "BUSD":
                     return float(asset['availableBalance'])
         elif market_type == MARKET_TYPE.MARGIN:
             account = self.spot_api.margin_account()
             for asset in account['userAssets']:
-                if asset['asset'] == 'USDT':
+                if asset['asset'] == 'BUSD':
                     return float(asset['free'])
         elif market_type == MARKET_TYPE.SPOT:
             account = self.spot_api.account()
             for balance in account['balances']:
-                if balance['asset'] == "USDT":
+                if balance['asset'] == "BUSD":
                     return float(balance['free'])
 
         return 0
@@ -92,30 +92,30 @@ class BinanceClient(Exchange):
         to_repay = 0
         assets = self.spot_api.margin_account()
         for asset in assets['userAssets']:
-            if asset['asset'] == 'USDT':
+            if asset['asset'] == 'BUSD':
                 to_repay = float(asset['borrowed']) + float(asset['interest'])
 
         if to_repay > 0:
-            logging.info(f"Repaying margin: {to_repay} USDT")
-            self.spot_api.margin_repay("USDT", round_to_precision(to_repay, "0.00000001"))
+            logging.info(f"Repaying margin: {to_repay} BUSD")
+            self.spot_api.margin_repay("BUSD", round_to_precision(to_repay, "0.00000001"))
             
     def __get_margin_loan(self):
-        max_borrowable = float(self.spot_api.margin_max_borrowable("USDT")['amount'])
+        max_borrowable = float(self.spot_api.margin_max_borrowable("BUSD")['amount'])
         if max_borrowable > 0:
-            logging.info(f"Taking marging loan: {max_borrowable} USDT")
-            self.spot_api.margin_borrow("USDT", round_to_precision(max_borrowable, "0.00000001"))
+            logging.info(f"Taking marging loan: {max_borrowable} BUSD")
+            self.spot_api.margin_borrow("BUSD", round_to_precision(max_borrowable, "0.00000001"))
 
     def transfer_funds(self, from_market : MARKET_TYPE, to_market : MARKET_TYPE):
         if from_market == MARKET_TYPE.SPOT and to_market == MARKET_TYPE.FUTURES:
-            self.spot_api.futures_transfer('USDT', int(self.get_balance(from_market)), 1)
+            self.spot_api.futures_transfer('BUSD', int(self.get_balance(from_market)), 1)
         elif from_market == MARKET_TYPE.SPOT and to_market == MARKET_TYPE.MARGIN:
-            self.spot_api.margin_transfer('USDT', int(self.get_balance(from_market)), 1)
+            self.spot_api.margin_transfer('BUSD', int(self.get_balance(from_market)), 1)
             self.__get_margin_loan()
         if from_market == MARKET_TYPE.FUTURES and to_market == MARKET_TYPE.SPOT:
-            self.spot_api.futures_transfer('USDT', int(self.get_balance(from_market)), 2)
+            self.spot_api.futures_transfer('BUSD', int(self.get_balance(from_market)), 2)
         elif from_market == MARKET_TYPE.MARGIN and to_market == MARKET_TYPE.SPOT:
             self.__repay_margin_loan()
-            self.spot_api.margin_transfer('USDT', int(self.get_balance(from_market)), 2)      
+            self.spot_api.margin_transfer('BUSD', int(self.get_balance(from_market)), 2)      
             
     @property
     def exchange(self) -> str:
@@ -129,7 +129,7 @@ class BinanceClient(Exchange):
             price_item = self.futures_api.mark_price(self.available_symbols[MARKET_TYPE.FUTURES][currency]['symbol'])
             return float(price_item['indexPrice'])
         elif market in [MARKET_TYPE.SPOT, MARKET_TYPE.MARGIN]:
-            price_item = self.spot_api.ticker_price(symbol=f"{currency}USDT")
+            price_item = self.spot_api.ticker_price(symbol=f"{currency}BUSD")
             return float(price_item['price'])
         
     
@@ -147,7 +147,7 @@ class BinanceClient(Exchange):
             if self.spot_ws_client == None:
                 self.spot_ws_client = BinanceWebsocketClient("wss://stream.binance.com:9443")
                 self.spot_ws_client.start()
-            self.spot_ws_client.instant_subscribe(f"{currency.lower()}usdt@aggTrade", cb_wrapper)
+            self.spot_ws_client.instant_subscribe(f"{currency.lower()}BUSD@aggTrade", cb_wrapper)
             
     def stop_market_watcher(self):
         if self.futures_ws_client != None:
@@ -248,7 +248,7 @@ class BinanceClient(Exchange):
             for asset in account['userAssets']:
                 if asset['asset'] == currency:
                     volume = float(asset['free'])
-            trades = self.spot_api.margin_my_trades(f"{currency}USDT", orderId=open_order_id)
+            trades = self.spot_api.margin_my_trades(f"{currency}BUSD", orderId=open_order_id)
             qty = 0
             cost = 0
             for trade in trades:
@@ -263,7 +263,7 @@ class BinanceClient(Exchange):
             for balance in account['balances']:
                 if balance['asset'] == currency:
                     volume = float(balance['free'])
-            trades = self.spot_api.my_trades(f"{currency}USDT", orderId=open_order_id)
+            trades = self.spot_api.my_trades(f"{currency}BUSD", orderId=open_order_id)
             qty = 0
             cost = 0
             for trade in trades:
@@ -282,14 +282,14 @@ class BinanceClient(Exchange):
         futures_symbols = {}
         exchange_info = self.futures_api.exchange_info()
         for symbol in exchange_info.get('symbols', []):
-            if symbol['status'] == 'TRADING' and symbol['contractType'] == 'PERPETUAL' and symbol['pair'].endswith('USDT'):
+            if symbol['status'] == 'TRADING' and symbol['contractType'] == 'PERPETUAL' and symbol['pair'].endswith('BUSD'):
                 s = symbol['pair'][0:-4]
                 futures_symbols[s] = symbol
         leverage_brackets = self.futures_api.leverage_brackets()
         futures_leverage_brackets = {}
         for item in leverage_brackets:
             symbol = item['symbol']
-            if symbol.endswith('USDT') and symbol[0:-4] in futures_symbols.keys():
+            if symbol.endswith('BUSD') and symbol[0:-4] in futures_symbols.keys():
                 futures_leverage_brackets[symbol[0:-4]] = item['brackets']
         self.futures_leverage_brackets = futures_leverage_brackets
         
@@ -299,7 +299,7 @@ class BinanceClient(Exchange):
         spot_symbols = {}
         margin_symbols = {}
         for symbol in exchange_info.get('symbols', []):
-            if symbol['status'] == 'TRADING' and symbol['symbol'].endswith('USDT'):
+            if symbol['status'] == 'TRADING' and symbol['symbol'].endswith('BUSD'):
                 s = symbol['symbol'][0:-4]
                 if symbol['isSpotTradingAllowed']:
                     spot_symbols[s] = symbol

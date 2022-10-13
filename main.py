@@ -27,14 +27,18 @@ clients = [binance_client.BinanceClient()]
 
 def get_currencies(title : str):
     words = [word.strip(',.') for word in title.split()]
+    items = []
+    for token in words:
+        for i in token.split('/'):
+            items.append(i)
     coins = {}
-    for word in words:
+    res = []
+    for word in items:
         stats = coin_info.info.coins.get(word, None)
         if stats != None:
             coins[stats['rank']] = word
-    res = []
     for rank in sorted(coins.keys()):
-        if rank >= dynamic_config.top_marketcaps_to_skip():
+        if rank >= dynamic_config.top_marketcaps_to_skip() and coins[rank] not in ['USDT', 'USDC', 'BUSD', 'DAI']:
             res.append(coins[rank])
     return res
     
@@ -55,9 +59,6 @@ def news_handler(n : news.News):
                     break
                 
 
-    
-def get_token_checker_fn(client : binance_client.BinanceClient):
-    return lambda x: client.has_currency(x) and x not in ["ETH", "BTC"]
     
     
 start_http_server(PROMETHEUS_SERVER_PORT)
