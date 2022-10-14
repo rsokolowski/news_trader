@@ -2,3 +2,4 @@ secrets.yaml
 __pycache__
 coin_info.json
 news_trading.session
+dynamic_config.yaml
