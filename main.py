@@ -52,18 +52,20 @@ def news_handler(n : news.News):
         
     if len(currencies) > 0:
         bot.send_message(f"Wykryto tokeny: {currencies}")
-        for client in clients:
-            for currency in currencies:
-                if client.has_currency(currency):
-                    trader = AutomaticTrader(clock=clock.Clock(), exchange=client, currency=currency)
-                    trader.notifier = bot.send_message
-                    Thread(target=trader.up_and_to_the_right).start()
-                    break
+        # for client in clients:
+        #     for currency in currencies:
+        #         if client.has_currency(currency):
+        #             trader = AutomaticTrader(clock=clock.Clock(), exchange=client, currency=currency)
+        #             trader.notifier = bot.send_message
+        #             Thread(target=trader.up_and_to_the_right).start()
+        #             break
                 
 
     
 start_http_server(PROMETHEUS_SERVER_PORT)
-binance_news_fetcher.fetch_in_background(news_handler, clock.Clock())
+n = news.News(news.Source.BINANCE_LISTING, int(time.time() * 1000), "Binance Adds New BSW, DODO, INJ, JST, MDX & MKR Cross Margin Pairs", "", "", [])
+news_handler(n)
+# binance_news_fetcher.fetch_in_background(news_handler, clock.Clock())
 logging.info("STARTING MAIN LOOP")
 
 while True:
