@@ -71,7 +71,7 @@ class BinanceNewsFetcher(object):
                 cache_hit = n['cache_hit']
                 FETCH_TIME.labels(source.name, cache_hit).observe(self.__clock.now() - start_time)
                 candidate = news.News(source, n['releaseDate'], n['title'], "", "", [])
-                logging.info(f"News: {candidate}")
+                #logging.info(f"News: {candidate}")
                 if candidate.title not in news.cache[source]:
                     news.cache[source][candidate.title] = candidate
                     return [candidate]
