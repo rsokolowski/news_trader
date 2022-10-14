@@ -16,6 +16,7 @@ from automatic_trader import AutomaticTrader
 from telegram_client import TelegramListener
 import coin_info
 import dynamic_config
+import random
 
 PROMETHEUS_SERVER_PORT = 11447
 
@@ -26,7 +27,7 @@ clients = [binance_client.BinanceClient()]
 
 
 def get_currencies(title : str):
-    words = [word.strip(',.') for word in title.split()]
+    words = [word.strip(',.()') for word in title.split()]
     items = []
     for token in words:
         for i in token.split('/'):
@@ -40,6 +41,7 @@ def get_currencies(title : str):
     for rank in sorted(coins.keys()):
         if rank >= dynamic_config.top_marketcaps_to_skip() and coins[rank] not in ['USDT', 'USDC', 'BUSD', 'DAI']:
             res.append(coins[rank])
+    random.shuffle(res)
     return res
     
 
@@ -60,10 +62,9 @@ def news_handler(n : news.News):
                 
 
     
-    
 start_http_server(PROMETHEUS_SERVER_PORT)
 binance_news_fetcher.fetch_in_background(news_handler, clock.Clock())
-
+logging.info("STARTING MAIN LOOP")
 
 while True:
     time.sleep(1)

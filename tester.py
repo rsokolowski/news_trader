@@ -8,21 +8,18 @@ import automatic_trader
 import telegram_bot
 import time
 from clock import Clock
-import coin_info
-
-bot = telegram_bot.Bot()
-
-
-def price_handler_futures(price):
-    logging.info(f"FUTURES Handling price: {price}")
-    
-def price_handler_spot(price):
-    logging.info(f"SPOT Handling price: {price}")
+import keys
+import requests
+import json
+import os
+import binance_news_fetcher
+from pathlib import Path
 
 
+def news_handler(aa):
+    pass
 
-coin_info = coin_info.CoinInfo()
-
+binance_news_fetcher.fetch_in_background(news_handler, Clock())
 
 
 
