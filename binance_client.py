@@ -1,4 +1,5 @@
 from cmath import log
+import decimal
 from re import L
 from turtle import pos, position
 from keys import keys
@@ -66,7 +67,12 @@ class BinanceClient(Exchange):
         self.spot_ws_client : BinanceWebsocketClient = None
         self.available_symbols = {}
         self.futures_leverage_brackets = {}
+        self.decimal_context = decimal.Context()
+        self.decimal_context.prec = 8
         self.__refresh_available_symbols()
+        
+    def new_decimal(self, value = 0) -> decimal.Decimal:
+        return decimal.Decimal(value=value, context=self.decimal_context)
         
         
     def get_balance(self, market_type : MARKET_TYPE) -> float:
@@ -89,30 +95,34 @@ class BinanceClient(Exchange):
         return 0
     
     def __repay_margin_loan(self):
-        to_repay = 0
+        to_repay = self.new_decimal()
         assets = self.spot_api.margin_account()
         for asset in assets['userAssets']:
             if asset['asset'] == 'BUSD':
-                to_repay = float(asset['borrowed']) + float(asset['interest'])
+                to_repay = self.new_decimal(asset['borrowed']) + self.new_decimal(asset['interest'])
 
         if to_repay > 0:
             logging.info(f"Repaying margin: {to_repay} BUSD")
-            self.spot_api.margin_repay("BUSD", round_to_precision(to_repay, "0.00000001"))
+            self.spot_api.margin_repay("BUSD", str(to_repay))
             
     def __get_margin_loan(self):
-        max_borrowable = float(self.spot_api.margin_max_borrowable("BUSD")['amount'])
+        max_borrowable = self.new_decimal(self.spot_api.margin_max_borrowable("BUSD")['amount'])
         if max_borrowable > 0:
             logging.info(f"Taking marging loan: {max_borrowable} BUSD")
-            self.spot_api.margin_borrow("BUSD", round_to_precision(max_borrowable, "0.00000001"))
+            self.spot_api.margin_borrow("BUSD", str(max_borrowable))
 
     def transfer_funds(self, from_market : MARKET_TYPE, to_market : MARKET_TYPE):
+        balance = int(self.get_balance(from_market))
+        if balance < 1:
+            logging.info(f"Balance too low for transfer: {balance}.")
+            return
         if from_market == MARKET_TYPE.SPOT and to_market == MARKET_TYPE.FUTURES:
-            self.spot_api.futures_transfer('BUSD', int(self.get_balance(from_market)), 1)
+                self.spot_api.futures_transfer('BUSD', balance, 1)
         elif from_market == MARKET_TYPE.SPOT and to_market == MARKET_TYPE.MARGIN:
-            self.spot_api.margin_transfer('BUSD', int(self.get_balance(from_market)), 1)
+            self.spot_api.margin_transfer('BUSD', balance, 1)
             self.__get_margin_loan()
         if from_market == MARKET_TYPE.FUTURES and to_market == MARKET_TYPE.SPOT:
-            self.spot_api.futures_transfer('BUSD', int(self.get_balance(from_market)), 2)
+            self.spot_api.futures_transfer('BUSD', balance, 2)
         elif from_market == MARKET_TYPE.MARGIN and to_market == MARKET_TYPE.SPOT:
             self.__repay_margin_loan()
             self.spot_api.margin_transfer('BUSD', int(self.get_balance(from_market)), 2)      

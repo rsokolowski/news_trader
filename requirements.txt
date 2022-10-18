@@ -8,3 +8,4 @@ binance-futures-connector
 binance-connector
 certifi
 telethon
+gate-api>=4.26.0
