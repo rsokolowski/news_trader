@@ -78,7 +78,7 @@ class BinanceNewsFetcher(object):
                     return []
         except Exception as e:
             FETCH_ERROR_CNT.labels(source.name).inc()
-            logging.error(f"Error pulling binance announcement page: {e}")
+            logging.error(f"Error pulling binance announcement page from {url}: {e}")
             return []
         
         
