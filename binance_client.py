@@ -56,7 +56,7 @@ def round_price(price : float, filters) -> str:
             break
     return round_to_precision(price, tick_size)
 
-
+STABLE_COIN = 'BUSD'
 
 class BinanceClient(Exchange):
     
@@ -67,65 +67,62 @@ class BinanceClient(Exchange):
         self.spot_ws_client : BinanceWebsocketClient = None
         self.available_symbols = {}
         self.futures_leverage_brackets = {}
-        self.decimal_context = decimal.Context()
-        self.decimal_context.prec = 8
         self.__refresh_available_symbols()
-        
-    def new_decimal(self, value = 0) -> decimal.Decimal:
-        return decimal.Decimal(value=value, context=self.decimal_context)
+    
         
         
     def get_balance(self, market_type : MARKET_TYPE) -> float:
         if market_type == MARKET_TYPE.FUTURES:
             account = self.futures_api.account()
             for asset in account['assets']:
-                if asset['asset'] == "BUSD":
+                if asset['asset'] == STABLE_COIN:
                     return float(asset['availableBalance'])
         elif market_type == MARKET_TYPE.MARGIN:
             account = self.spot_api.margin_account()
             for asset in account['userAssets']:
-                if asset['asset'] == 'BUSD':
+                if asset['asset'] == STABLE_COIN:
                     return float(asset['free'])
         elif market_type == MARKET_TYPE.SPOT:
             account = self.spot_api.account()
             for balance in account['balances']:
-                if balance['asset'] == "BUSD":
+                if balance['asset'] == STABLE_COIN:
                     return float(balance['free'])
 
         return 0
     
     def __repay_margin_loan(self):
-        to_repay = self.new_decimal()
+        to_repay = decimal.Decimal()
         assets = self.spot_api.margin_account()
         for asset in assets['userAssets']:
-            if asset['asset'] == 'BUSD':
-                to_repay = self.new_decimal(asset['borrowed']) + self.new_decimal(asset['interest'])
+            if asset['asset'] == STABLE_COIN:
+                to_repay = decimal.Decimal(asset['borrowed']) + decimal.Decimal(asset['interest'])
 
         if to_repay > 0:
-            logging.info(f"Repaying margin: {to_repay} BUSD")
-            self.spot_api.margin_repay("BUSD", str(to_repay))
+            logging.info(f"Repaying margin: {to_repay} {STABLE_COIN}")
+            self.spot_api.margin_repay(STABLE_COIN, str(to_repay))
             
     def __get_margin_loan(self):
-        max_borrowable = self.new_decimal(self.spot_api.margin_max_borrowable("BUSD")['amount'])
+        max_borrowable = decimal.Decimal(self.spot_api.margin_max_borrowable(STABLE_COIN)['amount'])
         if max_borrowable > 0:
-            logging.info(f"Taking marging loan: {max_borrowable} BUSD")
-            self.spot_api.margin_borrow("BUSD", str(max_borrowable))
+            logging.info(f"Taking marging loan: {max_borrowable} {STABLE_COIN}")
+            self.spot_api.margin_borrow(STABLE_COIN, str(max_borrowable))
 
-    def transfer_funds(self, from_market : MARKET_TYPE, to_market : MARKET_TYPE):
+    def transfer_funds(self, from_market : MARKET_TYPE, to_market : MARKET_TYPE, target_currency : str):
+        decimal.getcontext().prec = 8
         balance = int(self.get_balance(from_market))
         if balance < 1:
             logging.info(f"Balance too low for transfer: {balance}.")
             return
         if from_market == MARKET_TYPE.SPOT and to_market == MARKET_TYPE.FUTURES:
-                self.spot_api.futures_transfer('BUSD', balance, 1)
+                self.spot_api.futures_transfer(STABLE_COIN, balance, 1)
         elif from_market == MARKET_TYPE.SPOT and to_market == MARKET_TYPE.MARGIN:
-            self.spot_api.margin_transfer('BUSD', balance, 1)
+            self.spot_api.margin_transfer(STABLE_COIN, balance, 1)
             self.__get_margin_loan()
         if from_market == MARKET_TYPE.FUTURES and to_market == MARKET_TYPE.SPOT:
-            self.spot_api.futures_transfer('BUSD', balance, 2)
+            self.spot_api.futures_transfer(STABLE_COIN, balance, 2)
         elif from_market == MARKET_TYPE.MARGIN and to_market == MARKET_TYPE.SPOT:
             self.__repay_margin_loan()
-            self.spot_api.margin_transfer('BUSD', int(self.get_balance(from_market)), 2)      
+            self.spot_api.margin_transfer(STABLE_COIN, int(self.get_balance(from_market)), 2)      
             
     @property
     def exchange(self) -> str:
@@ -139,7 +136,7 @@ class BinanceClient(Exchange):
             price_item = self.futures_api.mark_price(self.available_symbols[MARKET_TYPE.FUTURES][currency]['symbol'])
             return float(price_item['indexPrice'])
         elif market in [MARKET_TYPE.SPOT, MARKET_TYPE.MARGIN]:
-            price_item = self.spot_api.ticker_price(symbol=f"{currency}BUSD")
+            price_item = self.spot_api.ticker_price(symbol=f"{currency}{STABLE_COIN}")
             return float(price_item['price'])
         
     
@@ -157,7 +154,7 @@ class BinanceClient(Exchange):
             if self.spot_ws_client == None:
                 self.spot_ws_client = BinanceWebsocketClient("wss://stream.binance.com:9443")
                 self.spot_ws_client.start()
-            self.spot_ws_client.instant_subscribe(f"{currency.lower()}BUSD@aggTrade", cb_wrapper)
+            self.spot_ws_client.instant_subscribe(f"{currency.lower()}{STABLE_COIN.lower()}@aggTrade", cb_wrapper)
             
     def stop_market_watcher(self):
         if self.futures_ws_client != None:
@@ -258,7 +255,7 @@ class BinanceClient(Exchange):
             for asset in account['userAssets']:
                 if asset['asset'] == currency:
                     volume = float(asset['free'])
-            trades = self.spot_api.margin_my_trades(f"{currency}BUSD", orderId=open_order_id)
+            trades = self.spot_api.margin_my_trades(f"{currency}{STABLE_COIN}", orderId=open_order_id)
             qty = 0
             cost = 0
             for trade in trades:
@@ -273,7 +270,7 @@ class BinanceClient(Exchange):
             for balance in account['balances']:
                 if balance['asset'] == currency:
                     volume = float(balance['free'])
-            trades = self.spot_api.my_trades(f"{currency}BUSD", orderId=open_order_id)
+            trades = self.spot_api.my_trades(f"{currency}{STABLE_COIN}", orderId=open_order_id)
             qty = 0
             cost = 0
             for trade in trades:
@@ -292,28 +289,33 @@ class BinanceClient(Exchange):
         futures_symbols = {}
         exchange_info = self.futures_api.exchange_info()
         for symbol in exchange_info.get('symbols', []):
-            if symbol['status'] == 'TRADING' and symbol['contractType'] == 'PERPETUAL' and symbol['pair'].endswith('BUSD'):
+            if symbol['status'] == 'TRADING' and symbol['contractType'] == 'PERPETUAL' and symbol['pair'].endswith(STABLE_COIN):
                 s = symbol['pair'][0:-4]
                 futures_symbols[s] = symbol
         leverage_brackets = self.futures_api.leverage_brackets()
         futures_leverage_brackets = {}
         for item in leverage_brackets:
             symbol = item['symbol']
-            if symbol.endswith('BUSD') and symbol[0:-4] in futures_symbols.keys():
+            if symbol.endswith(STABLE_COIN) and symbol[0:-4] in futures_symbols.keys():
                 futures_leverage_brackets[symbol[0:-4]] = item['brackets']
         self.futures_leverage_brackets = futures_leverage_brackets
         
         self.available_symbols[MARKET_TYPE.FUTURES] = futures_symbols
         
+        margin_pairs = {}
+        for pair in self.spot_api.margin_all_pairs():
+            if pair['symbol'].endswith(STABLE_COIN):
+                margin_pairs[pair['symbol'][0:-4]] = True
+        
         exchange_info = self.spot_api.exchange_info()
         spot_symbols = {}
         margin_symbols = {}
         for symbol in exchange_info.get('symbols', []):
-            if symbol['status'] == 'TRADING' and symbol['symbol'].endswith('BUSD'):
+            if symbol['status'] == 'TRADING' and symbol['symbol'].endswith(STABLE_COIN):
                 s = symbol['symbol'][0:-4]
                 if symbol['isSpotTradingAllowed']:
                     spot_symbols[s] = symbol
-                if symbol['isMarginTradingAllowed']:
+                if s in margin_pairs.keys():
                     margin_symbols[s] = symbol
         self.available_symbols[MARKET_TYPE.SPOT] = spot_symbols
         self.available_symbols[MARKET_TYPE.MARGIN] = margin_symbols

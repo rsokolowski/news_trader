@@ -92,7 +92,7 @@ class Exchange(ABC):
         pass
     
     @abstractmethod
-    def transfer_funds(self, from_market : MARKET_TYPE, to_market : MARKET_TYPE):
+    def transfer_funds(self, from_market : MARKET_TYPE, to_market : MARKET_TYPE, target_currency : str):
         pass
     
     

@@ -20,6 +20,7 @@ class AutomaticTrader(object):
         self.max_price : float = None
         self.stop_price : float = None
         self.stop_loss_triggered = False
+        self.initial_funds = None
         self.notifier = None
         self.open_order_id = None
         self.price_log_interval_s = 5
@@ -52,7 +53,11 @@ class AutomaticTrader(object):
     def __finish_trade(self, msg : str):
         self.stop_loss_triggered = True
         self.close_position(msg)
-        self.exchange.transfer_funds(self.market_type, MARKET_TYPE.SPOT)
+        if self.initial_funds != None:
+            funds_delta = self.exchange.get_balance(self.market_type) - self.initial_funds
+            self.log(f"Trade delta: {funds_delta:.0f} USD")
+            self.notify(f"Zmiana stanu konta: {funds_delta:.0f} USD")
+        self.exchange.transfer_funds(self.market_type, MARKET_TYPE.SPOT, self.currency)
         self.exchange.stop_market_watcher()
         
         
@@ -88,8 +93,9 @@ class AutomaticTrader(object):
         self.max_price = self.current_price
         self.log(f"Initial price is {self.current_price} USDT")
         if self.market_type != MARKET_TYPE.SPOT:
-            self.exchange.transfer_funds(MARKET_TYPE.SPOT, self.market_type)
+            self.exchange.transfer_funds(MARKET_TYPE.SPOT, self.market_type, self.currency)
         funds = self.exchange.get_balance(self.market_type)
+        self.initial_funds = funds
         leverage = self.exchange.get_max_leverage(self.currency, self.market_type, funds)
         if leverage > dynamic_config.max_leverage():
             leverage = dynamic_config.max_leverage()
@@ -98,7 +104,7 @@ class AutomaticTrader(object):
         if funds < 30:
             self.log(f"Low funds: {funds}. Bailing.")
             self.notify(f"Za mało środków na koncie: {funds}")
-            self.exchange.transfer_funds(self.market_type, MARKET_TYPE.SPOT)
+            self.exchange.transfer_funds(self.market_type, MARKET_TYPE.SPOT, self.currency)
         self.notify(f"cena początkowa {self.current_price} USDT. Dostępny kapitał to {funds:.0f} USDT.")
         self.log(f"Going to invest up to {funds} USD on trade.")
         limit_price = dynamic_config.open_position_price_percent() * self.current_price
@@ -121,7 +127,7 @@ class AutomaticTrader(object):
         else:
             self.log(f"Position not opened. We are done here.")
             self.notify(f"Nie udało się nic kupić. KONIEC.")
-            self.exchange.transfer_funds(self.market_type, MARKET_TYPE.SPOT)
+            self.exchange.transfer_funds(self.market_type, MARKET_TYPE.SPOT, self.currency)
             self.exchange.stop_market_watcher()
             return
         self.log(f"Waiting {dynamic_config.wait_time_after_initial_trade_s()} seconds for price action")
