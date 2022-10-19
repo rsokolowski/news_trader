@@ -7,7 +7,7 @@ import requests
 
 def fetch_binance_announcements(categoryId : int):
     # Generate random query/params to help prevent caching
-    rand_page_size = random.randint(1, 200)
+    rand_page_size = random.randint(1, 1)
     letters = string.ascii_letters
     random_string = "".join(random.choice(letters) for i in range(random.randint(10, 20)))
     random_number = random.randint(1, 99999999999999999999)
