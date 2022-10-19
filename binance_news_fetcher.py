@@ -64,7 +64,7 @@ class BinanceNewsFetcher(object):
                 }
                 n = requests.post(url, data=json.dumps(data), headers=headers).json()
                 if n == None:
-                    logging.error(f"Error pulling binance announcement page: no news returned")
+                    logging.error(f"Error pulling binance announcement page {url}: no news returned")
                     FETCH_ERROR_CNT.labels(source.name).inc()
                     return []
                 cache_hit = n['cache_hit']
