@@ -57,6 +57,8 @@ class AutomaticTrader(object):
             funds_delta = self.exchange.get_balance(self.market_type) - self.initial_funds
             self.log(f"Trade delta: {funds_delta:.0f} USD")
             self.notify(f"Zmiana stanu konta: {funds_delta:.0f} USD")
+        # Wait for everything to settle.
+        time.sleep(60)
         self.exchange.transfer_funds(self.market_type, MARKET_TYPE.SPOT, self.currency)
         self.exchange.stop_market_watcher()
         

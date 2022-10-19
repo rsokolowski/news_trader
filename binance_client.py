@@ -15,6 +15,7 @@ from binance.websocket.um_futures.websocket_client import UMFuturesWebsocketClie
 from binance.websocket.websocket_client import BinanceWebsocketClient
 import threading
 from typing import List
+from queue import Queue
 import random
 import time
 import clock
@@ -67,8 +68,57 @@ class BinanceClient(Exchange):
         self.spot_ws_client : BinanceWebsocketClient = None
         self.available_symbols = {}
         self.futures_leverage_brackets = {}
+        self.account_update_queue = Queue()
+        self.spot_account_change_ws_client : BinanceWebsocketClient = None
+        self.futures_account_change_ws_client : UMFuturesWebsocketClient = None
         self.__refresh_available_symbols()
-    
+        self.__refresh_account_change_ws_clients()
+        
+    def __process_account_change(self, item):
+        logging.info(f"Account change {item}")
+        self.account_update_queue.put(item)
+        
+    def __await(self, item):
+        logging.info(f"Awaiting for {item}")
+        while True:
+            curr = self.account_update_queue.get()
+            match = True
+            for (key, value) in item.items():
+                curr_v = curr.get(key, None)
+                if curr_v != value:
+                    match = False
+                    break
+            if match:
+                logging.info(f"{item} found.")
+                return
+            
+    def __refresh_account_change_ws_clients(self):
+        if self.spot_account_change_ws_client != None:
+            self.spot_account_change_ws_client.close()
+            self.spot_account_change_ws_client = None
+        if self.futures_account_change_ws_client != None:
+            self.futures_account_change_ws_client.close()
+            self.futures_account_change_ws_client = None
+        self.futures_account_change_ws_client = UMFuturesWebsocketClient()
+        self.futures_account_change_ws_client.start()
+        self.spot_account_change_ws_client = BinanceWebsocketClient("wss://stream.binance.com:9443")
+        self.spot_account_change_ws_client.start()
+        self.spot_account_change_ws_client.instant_subscribe(
+            stream=self.spot_api.new_listen_key()['listenKey'], 
+            callback=self.__process_account_change)
+        self.spot_account_change_ws_client.instant_subscribe(
+            stream=self.spot_api.new_margin_listen_key()['listenKey'], 
+            callback=self.__process_account_change)
+        self.futures_account_change_ws_client.instant_subscribe(
+            stream=self.futures_api.new_listen_key()['listenKey'], 
+            callback=self.__process_account_change)
+        
+        time.sleep(5)
+        threading.Timer(interval=5 * 60 * 60, function=self.__refresh_account_change_ws_clients).start()
+
+        
+        
+            
         
         
     def get_balance(self, market_type : MARKET_TYPE) -> float:
@@ -100,12 +150,14 @@ class BinanceClient(Exchange):
         if to_repay > 0:
             logging.info(f"Repaying margin: {to_repay} {STABLE_COIN}")
             self.spot_api.margin_repay(STABLE_COIN, str(to_repay))
+            self.__await({ "e": "balanceUpdate" })
             
     def __get_margin_loan(self):
         max_borrowable = decimal.Decimal(self.spot_api.margin_max_borrowable(STABLE_COIN)['amount'])
         if max_borrowable > 0:
             logging.info(f"Taking marging loan: {max_borrowable} {STABLE_COIN}")
             self.spot_api.margin_borrow(STABLE_COIN, str(max_borrowable))
+            self.__await({ "e": "balanceUpdate" })
 
     def transfer_funds(self, from_market : MARKET_TYPE, to_market : MARKET_TYPE, target_currency : str):
         decimal.getcontext().prec = 8
@@ -115,14 +167,22 @@ class BinanceClient(Exchange):
             return
         if from_market == MARKET_TYPE.SPOT and to_market == MARKET_TYPE.FUTURES:
                 self.spot_api.futures_transfer(STABLE_COIN, balance, 1)
+                self.__await({ "e": "balanceUpdate" })
+                self.__await({ "e": "balanceUpdate" })
         elif from_market == MARKET_TYPE.SPOT and to_market == MARKET_TYPE.MARGIN:
             self.spot_api.margin_transfer(STABLE_COIN, balance, 1)
+            self.__await({ "e": "balanceUpdate" })
+            self.__await({ "e": "balanceUpdate" })
             self.__get_margin_loan()
         if from_market == MARKET_TYPE.FUTURES and to_market == MARKET_TYPE.SPOT:
             self.spot_api.futures_transfer(STABLE_COIN, balance, 2)
+            self.__await({ "e": "balanceUpdate" })
+            self.__await({ "e": "balanceUpdate" })
         elif from_market == MARKET_TYPE.MARGIN and to_market == MARKET_TYPE.SPOT:
             self.__repay_margin_loan()
-            self.spot_api.margin_transfer(STABLE_COIN, int(self.get_balance(from_market)), 2)      
+            self.spot_api.margin_transfer(STABLE_COIN, int(self.get_balance(from_market)), 2)   
+            self.__await({ "e": "balanceUpdate" })
+            self.__await({ "e": "balanceUpdate" })
             
     @property
     def exchange(self) -> str:
