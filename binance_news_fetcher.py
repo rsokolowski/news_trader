@@ -52,7 +52,6 @@ class BinanceNewsFetcher(object):
     def fetch_binance_announcement_from_lambda(self, source : news.Source, categoryId : int):        
         url = f"{random.choice(LAMBDA_FETCHERS)}"
         headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
-
         start_time = self.__clock.now()
         cache_hit = False
         try:
