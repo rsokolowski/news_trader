@@ -258,6 +258,7 @@ class BinanceClient(Exchange):
                 symbol, side="BUY", type="LIMIT", timeInForce="GTC", 
                 quantity=volume, price=limit_price)
                 
+        self.__await({'e': 'executionReport', 'i': int(limit_order['orderId']), 'X': 'NEW' })
         return limit_order['orderId']
 
         
@@ -279,7 +280,8 @@ class BinanceClient(Exchange):
             limit_order = self.spot_api.new_order(
                 symbol, side="SELL", type="LIMIT", timeInForce="GTC", 
                 quantity=volume, price=limit_price)
-            
+        
+        self.__await({'e': 'executionReport', 'i': int(limit_order['orderId']), 'X': 'NEW' })
         return limit_order['orderId']
         
     def cancel_order(self, currency : str, market_type : MARKET_TYPE, order_id : str):
@@ -289,11 +291,12 @@ class BinanceClient(Exchange):
         
             if market_type == MARKET_TYPE.FUTURES:
                 resp = self.futures_api.cancel_order(symbol=symbol, orderId=order_id)
-                return resp
             if market_type == MARKET_TYPE.MARGIN:
                 resp = self.spot_api.cancel_margin_order(symbol=symbol, orderId=order_id)
             if market_type == MARKET_TYPE.SPOT:
                 resp = self.spot_api.cancel_order(symbol=symbol, orderId=order_id)
+            self.__await({'e': 'executionReport', 'i': int(order_id), 'X': 'CANCELED' })
+            return resp
             
         except binance.error.ClientError as e:
             if e.error_code != -2011 and e.error_message != "'Unknown order sent.'":
