@@ -50,7 +50,7 @@ class CoinInfo(object):
                 rank = item.get('cmc_rank', 0)
                 usd_data = item.get('quote', {}).get('USD', {})
                 market_cap = usd_data.get('market_cap', 0)
-                if symbol != None and rank != 0 and market_cap != 0 and rank < coins.get(symbol.upper(), {}).get('rank', 10000):
+                if symbol != None and rank != 0 and rank < coins.get(symbol.upper(), {}).get('rank', 10000):
                     coins[symbol.upper()] = {
                         'rank': rank,
                         'market_cap': market_cap
