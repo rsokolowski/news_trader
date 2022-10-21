@@ -114,7 +114,7 @@ class BinanceClient(Exchange):
             callback=self.__process_account_change)
         
         time.sleep(5)
-        threading.Timer(interval=5 * 60 * 60, function=self.__refresh_account_change_ws_clients).start()
+        threading.Timer(interval=1 * 60 * 60, function=self.__refresh_account_change_ws_clients).start()
 
         
         
