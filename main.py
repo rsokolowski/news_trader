@@ -38,8 +38,8 @@ def get_currencies(title : str):
         stats = coin_info.info.coins.get(word, None)
         if stats != None:
             coins[stats['rank']] = word
-    for rank in sorted(coins.keys()):
-        if rank >= dynamic_config.top_marketcaps_to_skip() and coins[rank] not in ['USDT', 'USDC', 'BUSD', 'DAI']:
+    for rank in sorted(coins.keys(), reverse=True):
+        if rank >= dynamic_config.top_marketcaps_to_skip() and coins[rank] not in dynamic_config.token_blacklist():
             res.append(coins[rank])
     random.shuffle(res)
     return res
@@ -48,8 +48,7 @@ def get_currencies(title : str):
 def news_handler(n : news.News):
     logging.info(f"Processing news: {n}")
     bot.send_news(n)
-    currencies = get_currencies(n.title)
-        
+    currencies = get_currencies(n.title) 
     if len(currencies) > 0:
         bot.send_message(f"Wykryto tokeny: {currencies}")
         for client in clients:

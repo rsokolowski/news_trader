@@ -2,6 +2,7 @@ import yaml
 import threading
 import os
 import logging
+from typing import List
 
 class DynamicConfig(object):
     
@@ -62,6 +63,9 @@ def coin_info_refresh_interval_s() -> float:
 
 def top_marketcaps_to_skip() -> int:
     return int(get('top_marketcaps_to_skip', 8))
+
+def token_blacklist() -> List[str]:
+    return get('token_blacklist', [])
 
 def get(key : str, default = None):
     return config.get(key, default)

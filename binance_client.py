@@ -162,6 +162,7 @@ class BinanceClient(Exchange):
     def transfer_funds(self, from_market : MARKET_TYPE, to_market : MARKET_TYPE, target_currency : str):
         decimal.getcontext().prec = 8
         balance = int(self.get_balance(from_market))
+        logging.info(f"Balance for transfer is {balance}")
         if balance < 1:
             logging.info(f"Balance too low for transfer: {balance}.")
             return
@@ -180,7 +181,18 @@ class BinanceClient(Exchange):
             self.__await({ "e": "balanceUpdate" })
         elif from_market == MARKET_TYPE.MARGIN and to_market == MARKET_TYPE.SPOT:
             self.__repay_margin_loan()
-            self.spot_api.margin_transfer(STABLE_COIN, int(self.get_balance(from_market)), 2)   
+            attempt = 0
+            while attempt < 3:
+                try:
+                    balance = int(self.get_balance(from_market))
+                    logging.info(f"Re-paid for transfer is {balance}")
+                    self.spot_api.margin_transfer(STABLE_COIN, balance, 2)   
+                except binance.error.ClientError as e:
+                    attempt += 1
+                    if e.error_code != -3020 and e.error_message != "Transfer out amount exceeds max amount.":
+                        raise(e)
+                    logging.info("Error when transfering from margin. Waiting for balance update.")
+                    time.sleep(0.5)
             self.__await({ "e": "balanceUpdate" })
             self.__await({ "e": "balanceUpdate" })
             

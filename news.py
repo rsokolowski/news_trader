@@ -18,7 +18,7 @@ class News(object):
         self.tokens = tokens
     
     def __repr__(self) -> str:
-        return f"{self.source.name}({datetime.datetime.fromtimestamp(self.timestamp / 1000.)})={self.title}"
+        return f"{self.source.name}({datetime.datetime.fromtimestamp(self.timestamp / 1000.)})={self.title} tokens=[{self.tokens}]"
     
 def discover_tokens(text, token_checker_fn) -> List[str]:
     tokens : List[str] = []

@@ -3,3 +3,5 @@ __pycache__
 coin_info.json
 news_trading.session
 dynamic_config.yaml
+vm_http_server_executor.py
+history_analysis.txt
