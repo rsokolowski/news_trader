@@ -48,7 +48,7 @@ class AutomaticTrader(object):
             
         if self.stop_price != None and self.stop_price > self.current_price and not self.stop_loss_triggered:
             self.stop_loss_triggered = True
-            Thread(target=self.__finish_trade, args=['Stop Loss. Zamykam pozycję.']).run()
+            Thread(target=self.__finish_trade, args=['Stop Loss. Zamykam pozycję.']).start()
     
     def __finish_trade(self, msg : str):
         self.stop_loss_triggered = True
